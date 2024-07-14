@@ -1,98 +1,100 @@
-use std::convert::TryInto;
+const BLOCK_SIZE: usize = 8; // Size of each block in bytes
+const HASH_SIZE: usize = 8; // Size of the hash code in bytes
 
-const BLOCK_SIZE: usize = 32; // Size of each block in bits
-const HASH_SIZE: usize = 32; // Size of the hash code in bits
-
-struct XorHasher {
+struct EvanHash {
     state: [u8; HASH_SIZE],
-    block_count: usize,
+    block: [u8; BLOCK_SIZE],
+    length: usize,
+    data: Vec<u8>,
 }
 
-impl XorHasher {
-    fn new() -> Self {
-        XorHasher {
-            state: [0; HASH_SIZE],
-            block_count: 0,
-        }
+impl EvanHash {
+    fn new(data: &[u8]) -> Self {
+      let hasher = EvanHash {
+        state: [0u8; HASH_SIZE],
+        block: [0u8; BLOCK_SIZE],
+        length: 0,
+        data: Vec::from(data),
+      };
+      println!("{:<12} {:?}", "state:", hasher.state);
+      hasher
     }
 
-    fn update(&mut self, data: &[u8]) {
-        let mut offset = 0;
+    fn update(&mut self) {
+        self.block = [0u8; BLOCK_SIZE];
+        let remaining = self.data.len() - self.length;
+        let end = self.length + remaining.min(BLOCK_SIZE);
 
-        while offset < data.len() {
-            let mut block = [0u8; BLOCK_SIZE];
-            let remaining = data.len() - offset;
-            let block_size = remaining.min(BLOCK_SIZE);
+        // fill the block from input data
+        self.block[..remaining.min(BLOCK_SIZE)].copy_from_slice(&self.data[self.length..end]);
 
-            block[..block_size].copy_from_slice(&data[offset..offset + block_size]);
-            self.process_block(&block);
-
-            offset += block_size;
-            self.block_count += 1;
+        // if this is the last block append data.len()
+        if remaining < BLOCK_SIZE {
+            self.block[remaining] = self.data.len() as u8;
         }
+
+        println!("block{:<7} {:?}", format!("{}:", self.length / BLOCK_SIZE), self.block);
+        self.process_block();
+
+        self.length += BLOCK_SIZE;
+
+        // TODO update state:
+        // loop 13 times
+        // if i == 0, nand with 0xff
+        // else if i % 2 == 0, right shift by 1
+        // if i % 3 == 0, left shift by 2
+        // if i % 4 == 0, swap first half with second half
+        // if i % 5 == 0, reverse
+        // if i % 6 == 0, xor with 0xff
+        // if i % 7 == 0, right shift by 2
+        // if i % 8 == 0, left shift by 1
+        // if i % 9 == 0, xor with 0x0f
+        // if i % 11 == 0, right shift by 3
+        // if i % 13 == 0, left shift by 3
+        // set state = NAND all iterations together with initial state
     }
 
     fn finalize(self) -> [u8; HASH_SIZE] {
         self.state
     }
 
-    fn process_block(&mut self, block: &[u8; BLOCK_SIZE]) {
+    fn process_block(&mut self) {
         for i in 0..HASH_SIZE {
-            // since we have HASH_SIZE == BLOCK_SIZE this is easy
-            self.state[i] ^= block[i];
+          // right shift by 1
+          self.state[i] ^= self.block[i];
         }
     }
-}
-
-fn xor_hash(data: &[u8]) -> [u8; HASH_SIZE] {
-    let mut hasher = XorHasher::new();
-    hasher.update(data);
-    hasher.finalize()
-}
-
-fn xor_hash_attack(data: &[u8]) -> Vec<u8> {
-    let mut padded_data = Vec::new();
-    let r = BLOCK_SIZE - (data.len() % BLOCK_SIZE);
-
-    if r != 0 {
-        let padding = vec![0; r];
-        padded_data.extend_from_slice(data);
-        padded_data.extend(padding);
+    
+    fn hash(data: &[u8]) -> [u8; HASH_SIZE] {
+      let mut hasher = EvanHash::new(&data);
+      while hasher.length <= hasher.data.len() {
+        hasher.update();
+      }
+      hasher.finalize()
     }
-    let mut mathcing_message = Vec::new();
-
-    for _ in 1..=3 {
-        mathcing_message.extend_from_slice(&padded_data);
-    }
-    mathcing_message
 }
+
 
 #[cfg(test)]
 mod tests {
-
-    use quickcheck::QuickCheck;
-
     use super::*;
 
-    #[test]
-    fn test_xor_attack() {
-        fn prop(data: Vec<u8>) -> bool {
-            xor_hash(&data) == xor_hash(&xor_hash_attack(&data))
-        }
-        QuickCheck::new().quickcheck(prop as fn(Vec<u8>) -> bool);
-    }
-
-    #[test]
-    fn attack_demo() {
-        let data = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0];
-        println!("{}", data.len());
-        let attack = xor_hash_attack(&data);
-        println!("{:?}", attack.len());
-        println!("{:?}", xor_hash(&data));
-        println!("{:?}", xor_hash(&attack));
-    }
+    // #[test]
+    // fn test_pad_function() {
+    //     let data = b"Hello World!";
+    //     let padded_data = EvanHash::pad(data);
+    //     let expected_data = vec![72, 101, 108, 108, 111, 32, 87, 111, 114, 108, 100, 33, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12];
+    //     assert_eq!(padded_data, expected_data, "Padded data does not match expected output");
+    // }
 }
 
 fn main() {
-    println!("Hello, world!");
+  let input = "Hello, World!";
+  println!("{:<12} \"{}\"", "input:", input);
+  let input = input.as_bytes();
+  println!("{:<12} {:?}", "bytes input:", input);
+  let hash_output = EvanHash::hash(input);
+  println!("{:<12} {:?}", "hash output:", hash_output);
+  let hex_output = hex::encode(hash_output);
+  println!("{:<12} {:?}", "hex output:", hex_output);
 }
