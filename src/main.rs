@@ -125,7 +125,7 @@ mod tests {
     fn test_hash_empty_input() {
         let data = b"";
         let expected_hash = INITIAL_STATE;
-        let hash_output = EvanHash::hash(data);
+        let hash_output = EvanHash::hash(data, false);
         assert_eq!(hash_output, expected_hash, "Hash of empty input does not match expected output");
     }
 
@@ -133,7 +133,7 @@ mod tests {
     fn test_hash_single_block() {
         let data = b"ABCDEFG"; // Exactly one block, including length byte
         let expected_hash = [72, 29, 111, 3, 59, 135, 57, 163];
-        let hash_output = EvanHash::hash(data);
+        let hash_output = EvanHash::hash(data, false);
         assert_eq!(hash_output, expected_hash, "Hash of single block input does not match expected output");
     }
 
@@ -141,7 +141,7 @@ mod tests {
     fn test_hash_multi_block() {
         let data = b"The quick brown fox jumps over the lazy dog"; // Longer than one block
         let expected_hash = [194, 19, 66, 50, 112, 155, 159, 251];
-        let hash_output = EvanHash::hash(data);
+        let hash_output = EvanHash::hash(data, false);
         assert_eq!(hash_output, expected_hash, "Hash of multi-block input does not match expected output");
     }
 
@@ -149,7 +149,7 @@ mod tests {
     fn test_hash_with_padding() {
         let data = b"Short"; // Requires padding to fill a block
         let expected_hash = [130, 173, 146, 187, 206, 95, 78, 196];
-        let hash_output = EvanHash::hash(data);
+        let hash_output = EvanHash::hash(data, false);
         assert_eq!(hash_output, expected_hash, "Hash with padding does not match expected output");
     }
 
@@ -157,8 +157,8 @@ mod tests {
     fn test_hash_identical_inputs() {
         let data1 = b"Identical";
         let data2 = b"Identical";
-        let hash_output1 = EvanHash::hash(data1);
-        let hash_output2 = EvanHash::hash(data2);
+        let hash_output1 = EvanHash::hash(data1, false);
+        let hash_output2 = EvanHash::hash(data2, false);
         assert_eq!(hash_output1, hash_output2, "Hashes of identical inputs do not match");
     }
 
@@ -166,8 +166,8 @@ mod tests {
     fn test_hash_different_inputs() {
         let data1 = b"Different";
         let data2 = b"Inputs";
-        let hash_output1 = EvanHash::hash(data1);
-        let hash_output2 = EvanHash::hash(data2);
+        let hash_output1 = EvanHash::hash(data1, false);
+        let hash_output2 = EvanHash::hash(data2, false);
         assert_ne!(hash_output1, hash_output2, "Hashes of different inputs should not match");
     }
 }
