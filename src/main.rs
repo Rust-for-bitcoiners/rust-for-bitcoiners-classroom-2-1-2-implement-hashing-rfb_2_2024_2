@@ -1,3 +1,5 @@
+use std::env;
+
 const BLOCK_SIZE: usize = 8; // Size of each block in bytes
 const HASH_SIZE: usize = 8; // Size of the hash code in bytes
 const INITIAL_STATE: [u8; HASH_SIZE] = [255, 100, 211, 37, 112, 167, 41, 37]; // randomly generated initial state
@@ -7,17 +9,18 @@ struct EvanHash {
     block: [u8; BLOCK_SIZE],
     length: usize,
     data: Vec<u8>,
+    debug: bool,
 }
 
 impl EvanHash {
-    fn new(data: &[u8]) -> Self {
+    fn new(data: &[u8], debug: bool) -> Self {
       let hasher = EvanHash {
         state: INITIAL_STATE,
         block: [0u8; BLOCK_SIZE],
         length: 0,
         data: Vec::from(data),
+        debug: debug,
       };
-      println!("{:<12} {:?}", "state:", hasher.state);
       hasher
     }
 
@@ -34,7 +37,7 @@ impl EvanHash {
             self.block[remaining] = self.data.len() as u8;
         }
 
-        println!("block{:<7} {:?}", format!("{}:", self.length / BLOCK_SIZE), self.block);
+        debug_print(self.debug, format!("block{:<7} {:?}", format!("{}:", self.length / BLOCK_SIZE), self.block));
         self.process_block();
 
         self.length += BLOCK_SIZE;
@@ -79,24 +82,39 @@ impl EvanHash {
       }
     }
     
-    fn hash(data: &[u8]) -> [u8; HASH_SIZE] {
-      let mut hasher = EvanHash::new(&data);
+    fn hash(data: &[u8], debug: bool) -> [u8; HASH_SIZE] {
+      let mut hasher = EvanHash::new(&data, debug);
+      debug_print(debug, format!("{:<12} {:?}", "state:", hasher.state));
       while hasher.length <= hasher.data.len() {
         hasher.update();
+        debug_print(debug, format!("{:<12} {:?}", "state:", hasher.state));
       }
       hasher.finalize()
     }
 }
 
+fn debug_print(debug: bool, message: String) {
+  if debug {
+      println!("{}", message);
+  }
+}
+
 fn main() {
-  let input = "Hello, World!";
-  println!("{:<12} \"{}\"", "input:", input);
+  let args: Vec<String> = env::args().collect();
+  if args.len() < 2 {
+      eprintln!("Usage: <input> [--debug]");
+      std::process::exit(1);
+  }
+
+  let input = &args[1];
+  let debug = args.iter().any(|arg| arg == "--debug");
+
+  debug_print(debug, format!("{:<12} \"{}\"", "input:", input));
   let input = input.as_bytes();
-  println!("{:<12} {:?}", "bytes input:", input);
-  let hash_output = EvanHash::hash(input);
-  println!("{:<12} {:?}", "hash output:", hash_output);
-  let hex_output = hex::encode(hash_output);
-  println!("{:<12} {:?}", "hex output:", hex_output);
+  debug_print(debug, format!("{:<12} {:?}", "bytes input:", input));
+  let hash_output = EvanHash::hash(input, debug);
+  debug_print(debug, format!("{:<12} {:?}", "hash output:", hash_output));
+  println!("{}", hex::encode(hash_output));
 }
 
 #[cfg(test)]
