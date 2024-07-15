@@ -1,5 +1,6 @@
 const BLOCK_SIZE: usize = 8; // Size of each block in bytes
 const HASH_SIZE: usize = 8; // Size of the hash code in bytes
+const INITIAL_STATE: [u8; HASH_SIZE] = [255, 100, 211, 37, 112, 167, 41, 37]; // randomly generated initial state
 
 struct EvanHash {
     state: [u8; HASH_SIZE],
@@ -11,7 +12,7 @@ struct EvanHash {
 impl EvanHash {
     fn new(data: &[u8]) -> Self {
       let hasher = EvanHash {
-        state: [0u8; HASH_SIZE],
+        state: INITIAL_STATE,
         block: [0u8; BLOCK_SIZE],
         length: 0,
         data: Vec::from(data),
@@ -37,21 +38,6 @@ impl EvanHash {
         self.process_block();
 
         self.length += BLOCK_SIZE;
-
-        // TODO update state:
-        // loop 13 times
-        // if i == 0, nand with 0xff
-        // else if i % 2 == 0, right shift by 1
-        // if i % 3 == 0, left shift by 2
-        // if i % 4 == 0, swap first half with second half
-        // if i % 5 == 0, reverse
-        // if i % 6 == 0, xor with 0xff
-        // if i % 7 == 0, right shift by 2
-        // if i % 8 == 0, left shift by 1
-        // if i % 9 == 0, xor with 0x0f
-        // if i % 11 == 0, right shift by 3
-        // if i % 13 == 0, left shift by 3
-        // set state = NAND all iterations together with initial state
     }
 
     fn finalize(self) -> [u8; HASH_SIZE] {
@@ -59,10 +45,38 @@ impl EvanHash {
     }
 
     fn process_block(&mut self) {
-        for i in 0..HASH_SIZE {
-          // right shift by 1
-          self.state[i] ^= self.block[i];
-        }
+      let mut temp_states: Vec<[u8; BLOCK_SIZE]> = Vec::new();
+      temp_states.push(self.state);
+  
+      for i in 0..13 {
+          let mut temp_block = self.block;
+          let block_as_u64: u64 = u64::from_be_bytes(temp_block.try_into().unwrap()); // Convert block to u64 for bitwise operations
+  
+          let modified_block_as_u64 = match i {
+              0 => !block_as_u64, // invert bits
+              1 => block_as_u64.rotate_right(17),
+              2 => block_as_u64.rotate_right(23),
+              3 => block_as_u64.rotate_right(32),
+              4 => block_as_u64.reverse_bits(),
+              5 => block_as_u64 ^ 0xAAAAAAAAAAAAAAAA, // Toggle every other bit starting with the first bit
+              6 => block_as_u64.rotate_right(43),
+              7 => block_as_u64 ^ 0x5555555555555555, // Toggle every other bit skipping the first bit
+              8 => block_as_u64.rotate_right(51),
+              9 => block_as_u64.rotate_right(13),
+              10 => block_as_u64.rotate_right(37),
+              11 => block_as_u64.rotate_right(19),
+              12 => block_as_u64.rotate_right(7),
+              _ => block_as_u64,
+          };
+  
+          temp_block = modified_block_as_u64.to_be_bytes(); // Convert back to byte array
+          temp_states.push(temp_block);
+      }
+  
+      // XOR all iterations together
+      for i in 0..BLOCK_SIZE {
+          self.state[i] = !temp_states.iter().fold(0xff, |acc, x| acc ^ x[i]);
+      }
     }
     
     fn hash(data: &[u8]) -> [u8; HASH_SIZE] {
@@ -72,20 +86,6 @@ impl EvanHash {
       }
       hasher.finalize()
     }
-}
-
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // #[test]
-    // fn test_pad_function() {
-    //     let data = b"Hello World!";
-    //     let padded_data = EvanHash::pad(data);
-    //     let expected_data = vec![72, 101, 108, 108, 111, 32, 87, 111, 114, 108, 100, 33, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12];
-    //     assert_eq!(padded_data, expected_data, "Padded data does not match expected output");
-    // }
 }
 
 fn main() {
